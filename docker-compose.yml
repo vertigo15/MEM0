@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mem0_postgres
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-mem0_db}
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres123}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - mem0_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-mem0_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Mem0 Application
+  mem0_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mem0_application
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres123}
+      DATABASE_NAME: ${DATABASE_NAME:-mem0_db}
+      
+      # LLM Provider Configuration
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      
+      # Azure OpenAI Configuration (if using Azure)
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
+      
+      # AWS Bedrock Configuration (if using AWS)
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
+      
+      # Storage Provider Configuration (optional)
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-}
+      
+      # AWS S3 Configuration (if using S3)
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      
+      # Azure Blob Configuration (if using Azure Blob)
+      AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME:-}
+      AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY:-}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-}
+      
+      # Application Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WORKERS: ${WORKERS:-1}
+    
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    
+    volumes:
+      - ./logs:/app/logs
+    
+    networks:
+      - mem0_network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Redis for caching (commented out by default)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mem0_redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - mem0_network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   restart: unless-stopped
+
+# Networks
+networks:
+  mem0_network:
+    driver: bridge
+    name: mem0_network
+
+# Volumes
+volumes:
+  postgres_data:
+    driver: local
+    name: mem0_postgres_data
+  # redis_data:
+  #   driver: local
+  #   name: mem0_redis_data

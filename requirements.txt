@@ -1,0 +1,30 @@
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Mem0 and AI dependencies
+mem0ai==0.1.11
+openai==1.12.0
+
+# Database dependencies
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# Cloud storage dependencies
+boto3==1.34.0
+azure-storage-blob==12.19.0
+
+# Azure OpenAI
+azure-openai==1.1.0
+
+# Logging and monitoring
+structlog==23.2.0
+
+# HTTP client
+httpx==0.26.0
+
+# JSON handling
+orjson==3.9.10
