@@ -60,12 +60,15 @@ WORKDIR /app
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
+# Create logs and qdrant data directories before copying files
+RUN mkdir -p /app/logs /app/qdrant_data
+
 # Copy application code
 COPY app.py .
 COPY --chown=appuser:appuser . .
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+# Set proper ownership for all app files and directories
+RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser

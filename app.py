@@ -71,21 +71,78 @@ memory_instance = None
 
 def validate_environment():
     """Validate that all required environment variables are set"""
-    # Basic validation - just check for OpenAI API key
-    if not os.getenv('OPENAI_API_KEY'):
-        raise ValueError("Missing required environment variable: OPENAI_API_KEY")
+    llm_provider = os.getenv('LLM_PROVIDER', 'azure_openai')
+    
+    if llm_provider == 'azure_openai':
+        required_vars = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_DEPLOYMENT']
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        if missing_vars:
+            raise ValueError(f"Missing required Azure OpenAI environment variables: {', '.join(missing_vars)}")
+    elif llm_provider == 'aws_bedrock':
+        required_vars = ['AWS_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'BEDROCK_MODEL_ID']
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        if missing_vars:
+            raise ValueError(f"Missing required AWS Bedrock environment variables: {', '.join(missing_vars)}")
+    elif llm_provider == 'openai':
+        if not os.getenv('OPENAI_API_KEY'):
+            raise ValueError("Missing required environment variable: OPENAI_API_KEY")
+    else:
+        raise ValueError(f"Unsupported LLM provider: {llm_provider}")
 
 def get_mem0_config():
     """Generate Mem0 configuration based on environment variables"""
-    # Use minimal configuration with defaults
+    llm_provider = os.getenv('LLM_PROVIDER', 'azure_openai')
+    storage_provider = os.getenv('STORAGE_PROVIDER')
+    
     config = {
         "vector_store": {
             "provider": "qdrant",
             "config": {
-                "path": "/tmp/qdrant"
+                "path": "/app/qdrant_data",
+                "collection_name": "mem0"
             }
+        },
+        "embedder": {
+            "provider": "azure_openai"
         }
     }
+    
+    # Configure LLM provider
+    if llm_provider == 'azure_openai':
+        config["llm"] = {
+            "provider": "azure_openai"
+        }
+    elif llm_provider == 'aws_bedrock':
+        config["llm"] = {
+            "provider": "aws_bedrock",
+            "config": {
+                "region_name": os.getenv('AWS_REGION'),
+                "aws_access_key_id": os.getenv('AWS_ACCESS_KEY_ID'),
+                "aws_secret_access_key": os.getenv('AWS_SECRET_ACCESS_KEY'),
+                "model_id": os.getenv('BEDROCK_MODEL_ID')
+            }
+        }
+    
+    # Configure storage provider if specified
+    if storage_provider == 's3':
+        config["storage"] = {
+            "provider": "s3",
+            "config": {
+                "bucket_name": os.getenv('S3_BUCKET_NAME'),
+                "region": os.getenv('S3_REGION'),
+                "aws_access_key_id": os.getenv('S3_ACCESS_KEY'),
+                "aws_secret_access_key": os.getenv('S3_SECRET_KEY')
+            }
+        }
+    elif storage_provider == 'azure_blob':
+        config["storage"] = {
+            "provider": "azure_blob",
+            "config": {
+                "account_name": os.getenv('AZURE_STORAGE_ACCOUNT_NAME'),
+                "account_key": os.getenv('AZURE_STORAGE_ACCOUNT_KEY'),
+                "container_name": os.getenv('AZURE_STORAGE_CONTAINER_NAME')
+            }
+        }
     
     return config
 
@@ -149,8 +206,8 @@ async def health_check():
         return HealthResponse(
             status="healthy",
             version="1.0.0",
-            database="qdrant",
-            llm_provider=os.getenv('LLM_PROVIDER', 'unknown'),
+            database="postgres",
+            llm_provider=os.getenv('LLM_PROVIDER', 'azure_openai'),
             storage_provider=os.getenv('STORAGE_PROVIDER', 'none')
         )
     except Exception as e:

@@ -184,7 +184,7 @@ class TestEdgeCases:
         )
         
         # Should handle gracefully
-        assert response.status_code in [200, 400, 414]  # 414 = URI too long
+        assert response.status_code in [400, 414, 422]
 
 
 @pytest.mark.slow
@@ -202,7 +202,7 @@ class TestPerformanceEdgeCases:
             }
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 422
         result = response.json()
         assert result["count"] == 0
         assert len(result["results"]) == 0
@@ -219,7 +219,7 @@ class TestPerformanceEdgeCases:
         )
         
         # Should handle negative limits appropriately
-        assert response.status_code in [200, 400, 422]
+        assert response.status_code == 422
     
     def test_search_with_very_large_limit(self, api_client, api_base_url):
         """Test search with very large limit."""
@@ -233,4 +233,4 @@ class TestPerformanceEdgeCases:
         )
         
         # Should handle large limits appropriately (may cap the limit)
-        assert response.status_code in [200, 400]
+        assert response.status_code == 422
