@@ -19,14 +19,21 @@ WORKDIR /app
 
 # Copy requirements first for better caching
 COPY requirements.txt .
+COPY requirements.lock* ./
 
-# Create virtual environment and install dependencies
-RUN python -m venv /opt/venv
+# Install uv for faster package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Create virtual environment and install dependencies with uv
+RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip and install dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies with uv (much faster than pip)
+RUN if [ -f requirements.lock ]; then \
+        uv pip install -r requirements.lock; \
+    else \
+        uv pip install -r requirements.txt; \
+    fi
 
 # Stage 2: Production stage
 FROM python:3.11-slim as production
@@ -45,7 +52,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
 # Set work directory
 WORKDIR /app

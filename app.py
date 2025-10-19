@@ -71,94 +71,21 @@ memory_instance = None
 
 def validate_environment():
     """Validate that all required environment variables are set"""
-    required_vars = [
-        'DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_USER', 
-        'DATABASE_PASSWORD', 'DATABASE_NAME', 'LLM_PROVIDER'
-    ]
-    
-    missing_vars = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
-    
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
-    
-    # Validate LLM provider specific variables
-    llm_provider = os.getenv('LLM_PROVIDER')
-    if llm_provider == 'azure_openai':
-        azure_vars = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_DEPLOYMENT']
-        for var in azure_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-    elif llm_provider == 'aws_bedrock':
-        aws_vars = ['AWS_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'BEDROCK_MODEL_ID']
-        for var in aws_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-    
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables for {llm_provider}: {', '.join(missing_vars)}")
+    # Basic validation - just check for OpenAI API key
+    if not os.getenv('OPENAI_API_KEY'):
+        raise ValueError("Missing required environment variable: OPENAI_API_KEY")
 
 def get_mem0_config():
     """Generate Mem0 configuration based on environment variables"""
+    # Use minimal configuration with defaults
     config = {
         "vector_store": {
-            "provider": "postgres",
+            "provider": "qdrant",
             "config": {
-                "host": os.getenv('DATABASE_HOST'),
-                "port": int(os.getenv('DATABASE_PORT', 5432)),
-                "user": os.getenv('DATABASE_USER'),
-                "password": os.getenv('DATABASE_PASSWORD'),
-                "dbname": os.getenv('DATABASE_NAME'),
+                "path": "/tmp/qdrant"
             }
         }
     }
-    
-    # Configure LLM
-    llm_provider = os.getenv('LLM_PROVIDER')
-    if llm_provider == 'azure_openai':
-        config["llm"] = {
-            "provider": "azure_openai",
-            "config": {
-                "api_key": os.getenv('AZURE_OPENAI_API_KEY'),
-                "azure_endpoint": os.getenv('AZURE_OPENAI_ENDPOINT'),
-                "api_version": os.getenv('AZURE_OPENAI_API_VERSION', '2024-02-01'),
-                "azure_deployment": os.getenv('AZURE_OPENAI_DEPLOYMENT'),
-            }
-        }
-    elif llm_provider == 'aws_bedrock':
-        config["llm"] = {
-            "provider": "aws_bedrock",
-            "config": {
-                "model": os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0'),
-                "aws_access_key_id": os.getenv('AWS_ACCESS_KEY_ID'),
-                "aws_secret_access_key": os.getenv('AWS_SECRET_ACCESS_KEY'),
-                "region_name": os.getenv('AWS_REGION'),
-            }
-        }
-    
-    # Configure storage if specified
-    storage_provider = os.getenv('STORAGE_PROVIDER')
-    if storage_provider == 's3':
-        config["storage"] = {
-            "provider": "s3",
-            "config": {
-                "bucket_name": os.getenv('S3_BUCKET_NAME'),
-                "region_name": os.getenv('S3_REGION'),
-                "aws_access_key_id": os.getenv('S3_ACCESS_KEY'),
-                "aws_secret_access_key": os.getenv('S3_SECRET_KEY'),
-            }
-        }
-    elif storage_provider == 'azure_blob':
-        config["storage"] = {
-            "provider": "azure_blob",
-            "config": {
-                "account_name": os.getenv('AZURE_STORAGE_ACCOUNT_NAME'),
-                "account_key": os.getenv('AZURE_STORAGE_ACCOUNT_KEY'),
-                "container_name": os.getenv('AZURE_STORAGE_CONTAINER_NAME'),
-            }
-        }
     
     return config
 
@@ -222,7 +149,7 @@ async def health_check():
         return HealthResponse(
             status="healthy",
             version="1.0.0",
-            database="postgresql",
+            database="qdrant",
             llm_provider=os.getenv('LLM_PROVIDER', 'unknown'),
             storage_provider=os.getenv('STORAGE_PROVIDER', 'none')
         )
